@@ -1,7 +1,7 @@
-# OBS Sticky Note — Spec
+# OBS Sticky Note Spec
 
-A sticky note for OBS showing a checklist of stream goals. Viewers see it as an
-overlay; the streamer checks items off from a clickable panel inside OBS.
+A sticky note for OBS showing a checklist of stream goals. Viewers see it as
+an overlay; the streamer checks items off from a clickable panel inside OBS.
 
 ## Decisions made
 
@@ -9,79 +9,83 @@ overlay; the streamer checks items off from a clickable panel inside OBS.
 |---|---|
 | Check-off method | OBS Custom Browser Dock (control) + Browser Source (display), auto-synced |
 | Visibility | Visible on stream as an overlay |
-| Style | Sticky-note aesthetic with multiple selectable themes; classic yellow is the default |
-| Checked items | Strikethrough + dim, stay in place so progress accumulates |
+| Style | Sticky-note look with selectable themes; classic yellow is the default |
+| Checked items | Strikethrough and dim, staying in place so progress accumulates |
 
 ## Architecture
 
-**One self-contained HTML file (`sticky-note.html`), no server, no build, no
-dependencies.** The same file is loaded in two places with a URL parameter
+**One self-contained HTML file (`sticky-note.html`): no server, no build, no
+dependencies.** The same file loads in two places, with a URL parameter
 choosing the mode:
 
-- `sticky-note.html?view=dock` — added in OBS under *View → Docks → Custom
-  Browser Docks*. Full editing UI: add / edit / delete / reorder tasks, check
-  items off, reset.
-- `sticky-note.html` (default, overlay mode) — added as a Browser Source in the
-  scene. Read-only, transparent page background, only the note itself renders.
+- `sticky-note.html?view=dock` is added in OBS under *View → Docks → Custom
+  Browser Docks*. Full editing UI: add, edit, delete, and reorder tasks,
+  check items off, reset.
+- `sticky-note.html` (default, overlay mode) is added as a Browser Source in
+  the scene. Read-only, transparent page background; only the note itself
+  renders.
 
 ### Sync between dock and overlay
 
-Both contexts run in OBS's embedded browser (CEF) and share `localStorage` when
-they load from the **same origin**. State is written to one localStorage key
-(JSON: list title + array of `{id, text, done}`), and the overlay updates via
-the `storage` event.
+Both contexts run in OBS's embedded browser (CEF) and share `localStorage`
+when they load from the same origin. State lives under one localStorage key
+(JSON: list title plus an array of `{id, text, done}`), and the overlay
+updates on the `storage` event.
 
-**Key implementation detail:** the Browser Source must be configured with
-*Local file unchecked* and the same `file:///` URL the dock uses. (OBS's "Local
-file" mode serves the page from a different internal origin, which would split
-the localStorage.) Setup instructions will spell this out.
+The Browser Source must be configured with *Local file unchecked* and the
+same `file:///` URL the dock uses. OBS's "Local file" mode serves the page
+from a different internal origin, which would split the localStorage. The
+README spells this out.
 
-**Fallback:** in addition to the `storage` event, the overlay polls localStorage
-once per second. If events ever fail to propagate across CEF contexts, sync
-still works with ≤1 s latency.
+As a fallback, the overlay also polls localStorage once per second. If events
+fail to propagate across CEF contexts, sync still works with at most 1 s of
+latency.
 
-Persistence across OBS restarts comes free with localStorage.
+localStorage also gives us persistence across OBS restarts for free.
 
 ## Features
 
 ### Dock (control panel)
 - Editable note title (default: "Today's Goals")
-- Theme picker: a row of swatches; clicking one restyles both the dock preview
-  and the live overlay (theme is part of the synced state)
-- Custom colors: Paper and Ink color pickers; changing either switches to a
-  "custom" theme derived from the two colors (gradient, corner curl, and dimmed
-  ink computed automatically); clicking a swatch returns to a preset
+- Theme picker: a row of swatches; clicking one restyles both the dock
+  preview and the live overlay (theme is part of the synced state)
+- Custom colors: Paper and Ink pickers. Changing either switches to a
+  "custom" theme derived from the two colors, with the gradient, corner curl,
+  and dimmed ink computed from them. Clicking a swatch returns to a preset.
 - Size slider (50–200%) and Tilt slider (±15°), both synced to the overlay
 - Text input + Enter to add a task
-- Click checkbox to toggle done
+- Click a checkbox to toggle done
 - Edit task text inline; delete a task; reorder via up/down buttons
 - "Uncheck all" (reuse the list next stream) and "Clear list" (with confirm)
-- Shows the same sticky-note rendering as the overlay, so what you see is what
-  viewers see
+- Shows the same sticky-note rendering as the overlay, so what you see is
+  what viewers see
 
 ### Overlay (browser source)
-- Renders the note only — page background fully transparent
-- Checking an item: checkmark draws in like a pen stroke, then an animated
-  strikethrough crosses the text; item dims to ~50% and stays in place
-- Unchecking cleanly reverses the state (no animation replay spam)
+- Renders the note only, on a transparent page background
+- Checking an item: the checkmark draws in like a pen stroke, then an
+  animated strikethrough crosses the text; the item dims to about 50% and
+  stays in place
+- Unchecking reverses the state without replaying animations
 - Small progress line at the bottom of the note: "2 / 5 done"
-- When everything is done: brief, tasteful celebration (note does a little
-  wiggle + "All done!" stamp). No sound.
+- When the last item is checked, the note wiggles and an "All done!" stamp
+  appears. No sound.
 
-## Visual design & themes
+## Visual design and themes
 
-Shared across all themes:
+Shared across themes:
 
-- Sticky-note silhouette: soft drop shadow, rotated ~-2°, slightly darker
+- Sticky-note silhouette: soft drop shadow, a slight tilt, and a darker
   fold/curl at one corner
-- Handwritten font (e.g. Caveat), **embedded as base64 woff2** in the HTML so
-  the note works offline and never depends on a CDN
-- Hand-drawn-looking checkboxes; pen-stroke check and strikethrough animations
-- Base size ~380 px wide at 1080p, height grows with the list; a `?scale=1.5`
-  URL parameter scales the whole note for other canvas sizes
+- Handwritten font (Caveat), embedded as base64 woff2 so the note works
+  offline with no CDN dependency
+- Hand-drawn-looking checkboxes; pen-stroke check and strikethrough
+  animations
+- Base size about 380 px wide at 1080p; height grows with the list. Size and
+  tilt are adjustable with dock sliders, and a `?scale=` URL parameter adds
+  an extra multiplier.
 
-Themes (paper + ink + accent bundled; picked in the dock, stored in synced
-state so the overlay follows instantly):
+Themes bundle paper, ink, and accent colors. They're picked in the dock and
+stored in synced state, so the overlay follows.
 
 | Theme | Look |
 |---|---|
@@ -91,20 +95,20 @@ state so the overlay follows instantly):
 | **Green** | Pastel green paper, dark ink |
 | **Lined Notepad** | White paper with ruled lines and a red margin line |
 | **Kraft** | Brown paper texture, marker-style dark ink |
-| **Midnight** | Dark charcoal note, chalk-white ink — for dark overlay setups |
-| **Custom** | Any paper + ink color via pickers in the dock; shading derived automatically |
+| **Midnight** | Dark charcoal note with chalk-white ink, for dark overlay setups |
+| **Custom** | Any paper and ink color via the pickers; shading derived from the two |
 
-Themes are defined as CSS custom-property sets, so adding a new one later is a
-few lines of CSS, not a redesign.
+Each theme is a CSS custom-property set, so adding a new one later takes a
+few lines of CSS.
 
-## Setup (will ship as README)
+## Setup (ships as README)
 
 1. Save `sticky-note.html` anywhere on disk.
 2. OBS → View → Docks → Custom Browser Docks → add
    `file:///path/to/sticky-note.html?view=dock`. Dock it wherever you like.
-3. Scene → Add → Browser Source → **uncheck Local file** → URL
-   `file:///path/to/sticky-note.html` → size ~420×600.
-4. Type tasks in the dock; the overlay follows automatically.
+3. Scene → Add → Browser Source → uncheck Local file → URL
+   `file:///path/to/sticky-note.html` → size ~470×700.
+4. Type tasks in the dock; the overlay follows.
 
 ## Out of scope (possible later)
 
@@ -117,12 +121,13 @@ few lines of CSS, not a redesign.
 ## Acceptance checklist
 
 - [ ] Adding a task in the dock appears on the overlay within 1 s
-- [ ] Checking an item plays checkmark + strikethrough animation on the overlay
-- [ ] Item stays visible, crossed out and dimmed
+- [ ] Checking an item plays the checkmark and strikethrough animation on the
+      overlay
+- [ ] The item stays visible, crossed out and dimmed
 - [ ] All state survives a full OBS restart
-- [ ] Overlay background is transparent over any scene
+- [ ] The overlay background is transparent over any scene
 - [ ] Picking a theme in the dock restyles the overlay within 1 s, and the
       choice survives an OBS restart
-- [ ] Whole thing works with networking disabled (fully offline)
-- [ ] Note stays legible with 10+ tasks and with long task text (wraps, no
+- [ ] Works with networking disabled
+- [ ] The note stays legible with 10+ tasks and long task text (wraps, no
       overflow)
